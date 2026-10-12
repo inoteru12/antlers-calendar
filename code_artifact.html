@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>鹿島アントラーズ 試合＆チケット日程同期アプリ</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    :root {
+      --antlers-red: #9E0B0F;
+      --antlers-navy: #001128;
+      --antlers-gold: #D4AF37;
+    }
+    .bg-antlers-red { background-color: var(--antlers-red); }
+    .bg-antlers-navy { background-color: var(--antlers-navy); }
+    .text-antlers-red { color: var(--antlers-red); }
+    .text-antlers-gold { color: var(--antlers-gold); }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #ECEFF1;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      justify-content: center;
+      min-height: 100vh;
+    }
+    .custom-scroll::-webkit-scrollbar {
+      width: 4px;
+    }
+    .custom-scroll::-webkit-scrollbar-thumb {
+      background-color: rgba(0, 0, 0, 0.15);
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body class="p-0 sm:p-4">
+
+  <!-- スマホコンテナ -->
+  <div class="w-full max-w-md bg-[#F7F8FA] min-h-screen sm:min-h-[844px] sm:max-h-[890px] sm:rounded-[36px] shadow-2xl flex flex-col relative overflow-hidden border-0 sm:border-8 sm:border-slate-800">
+    
+    <!-- ステータスバー -->
+    <div class="bg-antlers-navy text-white text-xs px-6 pt-3 pb-2 flex justify-between items-center select-none z-20">
+      <span class="font-semibold text-gray-200" id="current-time">19:30</span>
+      <div class="flex items-center space-x-1.5 text-gray-300">
+        <i data-lucide="signal" class="w-3.5 h-3.5"></i>
+        <i data-lucide="wifi" class="w-3.5 h-3.5"></i>
+        <i data-lucide="battery-medium" class="w-4 h-4"></i>
+      </div>
+    </div>
+
+    <!-- ヘッダー -->
+    <header class="bg-antlers-navy text-white px-4 py-3 flex items-center justify-between shadow-md z-20">
+      <div class="flex items-center space-x-2.5">
+        <div class="w-8 h-8 rounded-lg bg-antlers-red flex items-center justify-center font-black text-white text-sm shadow">
+          鹿
+        </div>
+        <div>
+          <h1 class="text-xs font-black tracking-widest text-antlers-gold leading-tight">KASHIMA ANTLERS</h1>
+          <p class="text-[11px] text-gray-300">試合＆チケット日程連携</p>
+        </div>
+      </div>
+      <button id="btn-sync-all-header" class="text-xs bg-antlers-red hover:bg-red-700 active:scale-95 text-white font-bold px-3 py-1.5 rounded-full flex items-center space-x-1 shadow transition">
+        <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+        <span>一括同期</span>
+      </button>
+    </header>
+
+    <!-- メインコンテンツ -->
+    <main class="flex-1 overflow-y-auto custom-scroll relative pb-20">
+
+      <!-- 画面1: 試合日程 -->
+      <section id="tab-matches" class="space-y-3">
+        <div class="bg-antlers-navy/95 px-4 py-2.5 flex items-center justify-between border-t border-gray-800 sticky top-0 z-10 backdrop-blur">
+          <div class="flex space-x-1.5">
+            <button class="filter-btn active px-3 py-1 rounded-full text-[11px] font-bold bg-antlers-red text-white border border-antlers-gold shadow-sm transition" data-filter="ALL">すべて</button>
+            <button class="filter-btn px-3 py-1 rounded-full text-[11px] text-gray-300 bg-white/10 hover:bg-white/20 transition" data-filter="HOME">HOME (カシマ)</button>
+            <button class="filter-btn px-3 py-1 rounded-full text-[11px] text-gray-300 bg-white/10 hover:bg-white/20 transition" data-filter="AWAY">AWAY</button>
+          </div>
+          <span id="match-count-badge" class="text-[10px] text-gray-400">3試合</span>
+        </div>
+
+        <div id="match-card-list" class="p-3.5 space-y-3.5"></div>
+      </section>
+
+      <!-- 画面2: チケット発売 -->
+      <section id="tab-tickets" class="hidden p-3.5 space-y-3">
+        <div class="bg-red-50 border border-red-200 rounded-xl p-3 flex items-start space-x-2.5 text-xs text-red-950">
+          <i data-lucide="info" class="w-4 h-4 text-antlers-red shrink-0 mt-0.5"></i>
+          <div>
+            <p class="font-bold">チケット発売通知について</p>
+            <p class="text-[11px] text-red-800/80 mt-0.5">SÓCIO先行・ファンクラブ先行・一般発売の販売開始（10:00）に合わせてリマインダーを設定できます。</p>
+          </div>
+        </div>
+        <div id="ticket-timeline-list" class="space-y-2.5"></div>
+      </section>
+
+      <!-- 画面3: 連携・通知設定 -->
+      <section id="tab-settings" class="hidden p-3.5 space-y-4">
+        <div class="bg-gradient-to-br from-antlers-navy to-[#0F2F5E] text-white p-4 rounded-2xl shadow-md">
+          <div class="flex justify-between items-center">
+            <span class="text-xs text-gray-300 font-semibold">カレンダー連携状況</span>
+            <span class="text-[11px] font-bold bg-amber-400/20 text-antlers-gold border border-antlers-gold px-2 py-0.5 rounded-full flex items-center space-x-1">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+              <span>自動同期中</span>
+            </span>
+          </div>
+
+          <div class="grid grid-cols-2 gap-3 mt-3.5 text-center divide-x divide-white/10">
+            <div>
+              <p class="text-[11px] text-gray-300">同期中の試合</p>
+              <p id="stat-synced-matches" class="text-xl font-black text-white mt-0.5">2 試合</p>
+            </div>
+            <div>
+              <p class="text-[11px] text-gray-300">通知予定チケット</p>
+              <p id="stat-synced-tickets" class="text-xl font-black text-antlers-gold mt-0.5">4 件</p>
+            </div>
+          </div>
+
+          <button id="btn-re-sync" class="w-full mt-4 bg-antlers-red hover:bg-red-700 active:scale-[0.98] text-white text-xs font-bold py-2.5 rounded-xl shadow flex items-center justify-center space-x-1.5 transition">
+            <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+            <span>全日程・チケットをカレンダーに即時反映</span>
+          </button>
+        </div>
+
+        <div class="bg-white rounded-2xl p-4 border border-gray-200 shadow-sm space-y-2.5">
+          <h2 class="text-xs font-bold text-gray-800">実カレンダーファイル (.ics) ダウンロード</h2>
+          <p class="text-[11px] text-gray-600 leading-relaxed">
+            鹿島アントラーズの試合日程とチケット発売日を本物のカレンダーファイルとして書き出せます。
+          </p>
+          <button id="btn-export-ics" class="w-full bg-slate-800 hover:bg-slate-900 active:scale-[0.98] text-white text-xs font-bold py-2.5 rounded-xl shadow flex items-center justify-center space-x-1.5 transition">
+            <i data-lucide="download" class="w-4 h-4 text-antlers-gold"></i>
+            <span>iCal形式（.ics）で保存</span>
+          </button>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- 観戦メモ＆SNSモーダル -->
+    <div id="review-modal" class="fixed inset-0 bg-black/60 z-40 opacity-0 pointer-events-none transition-opacity duration-300 flex items-end justify-center">
+      <div id="review-modal-content" class="bg-white w-full max-w-md rounded-t-3xl max-h-[90vh] overflow-y-auto p-5 transform translate-y-full transition-transform duration-300 ease-out space-y-4 shadow-2xl">
+        <div class="w-10 h-1.5 bg-gray-300 rounded-full mx-auto -mt-1 mb-1"></div>
+
+        <div class="flex justify-between items-start border-b border-gray-100 pb-3">
+          <div>
+            <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-antlers-red text-white">MATCH LOG</span>
+            <h3 id="review-match-title" class="text-base font-black text-gray-900 mt-1">観戦記録</h3>
+            <p class="text-xs text-gray-500">試合結果の入力・感想メモ・SNS連携</p>
+          </div>
+          <button id="btn-close-review" class="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-600">
+            <i data-lucide="x" class="w-4 h-4"></i>
+          </button>
+        </div>
+
+        <div class="bg-gradient-to-br from-[#FAF5F5] to-white p-3.5 rounded-2xl border border-red-100 space-y-2">
+          <label class="text-[11px] font-bold text-gray-700 block">試合結果・スコア</label>
+          <div class="flex items-center justify-around py-1">
+            <div class="text-center">
+              <span class="text-xs font-black text-antlers-red block">鹿島</span>
+              <input id="score-kashima" type="number" min="0" max="20" class="w-14 text-center text-xl font-black bg-white border border-gray-300 rounded-lg py-1 mt-1 focus:ring-2 focus:ring-antlers-red focus:outline-none" value="2">
+            </div>
+            <span class="text-lg font-black text-gray-400">-</span>
+            <div class="text-center">
+              <span id="score-opponent-name" class="text-xs font-black text-gray-700 block">相手</span>
+              <input id="score-opponent" type="number" min="0" max="20" class="w-14 text-center text-xl font-black bg-white border border-gray-300 rounded-lg py-1 mt-1 focus:ring-2 focus:ring-antlers-red focus:outline-none" value="1">
+            </div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="text-[11px] font-bold text-gray-700 block mb-1">観戦スタイル</label>
+            <select id="review-style" class="w-full text-xs border border-gray-200 rounded-xl p-2.5 bg-gray-50 font-semibold focus:outline-none focus:ring-2 focus:ring-antlers-red">
+              <option value="現地観戦 (カシマスタジアム)">カシマ現地観戦</option>
+              <option value="現地観戦 (アウェイ遠征)">アウェイ現地観戦</option>
+              <option value="DAZN視聴">DAZN・生配信</option>
+              <option value="スポーツバー/PV">PV/バー観戦</option>
+            </select>
+          </div>
+          <div>
+            <label class="text-[11px] font-bold text-gray-700 block mb-1">満足度 (★)</label>
+            <div id="star-rating" class="flex items-center space-x-1 py-1.5 px-2 bg-gray-50 rounded-xl border border-gray-200">
+              <button type="button" class="star-btn text-amber-400 text-lg" data-value="1">★</button>
+              <button type="button" class="star-btn text-amber-400 text-lg" data-value="2">★</button>
+              <button type="button" class="star-btn text-amber-400 text-lg" data-value="3">★</button>
+              <button type="button" class="star-btn text-amber-400 text-lg" data-value="4">★</button>
+              <button type="button" class="star-btn text-amber-400 text-lg" data-value="5">★</button>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <label class="text-[11px] font-bold text-gray-700 block mb-1">今日のマイMOM</label>
+          <input id="review-mom" type="text" placeholder="例: 鈴木優磨、知念慶、早川友基 など" class="w-full text-xs border border-gray-200 rounded-xl p-2.5 bg-gray-50 font-medium focus:outline-none focus:ring-2 focus:ring-antlers-red">
+        </div>
+
+        <div>
+          <label class="text-[11px] font-bold text-gray-700 block mb-1">観戦の感想・応援コメント</label>
+          <textarea id="review-comment" rows="3" placeholder="試合の感想、もつ煮などのスタグル、応援の熱狂ぶりをメモ..." class="w-full text-xs border border-gray-200 rounded-xl p-2.5 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-antlers-red resize-none"></textarea>
+        </div>
+
+        <div class="space-y-2 pt-1">
+          <button id="btn-save-review" class="w-full bg-antlers-red hover:bg-red-700 text-white text-xs font-bold py-2.5 rounded-xl shadow flex items-center justify-center space-x-1.5 transition">
+            <i data-lucide="check" class="w-4 h-4"></i>
+            <span>観戦ログを保存</span>
+          </button>
+
+          <div class="pt-2 border-t border-gray-100">
+            <p class="text-[10px] font-bold text-gray-500 mb-2 text-center">この試合の感想をSNSへシェア！</p>
+            <div class="grid grid-cols-3 gap-2">
+              <button id="btn-share-x" class="bg-black hover:bg-zinc-800 text-white text-xs font-bold py-2.5 rounded-xl shadow flex items-center justify-center space-x-1 transition">
+                <span class="font-black">𝕏</span>
+                <span>でポスト</span>
+              </button>
+              <button id="btn-share-line" class="bg-[#06C755] hover:bg-[#05b34c] text-white text-xs font-bold py-2.5 rounded-xl shadow flex items-center justify-center space-x-1 transition">
+                <i data-lucide="message-circle" class="w-3.5 h-3.5"></i>
+                <span>LINE</span>
+              </button>
+              <button id="btn-share-copy" class="bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold py-2.5 rounded-xl flex items-center justify-center space-x-1 transition">
+                <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                <span>コピー</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- トースト通知 -->
+    <div id="toast" class="fixed bottom-20 left-1/2 transform -translate-x-1/2 bg-gray-900/90 text-white text-xs font-semibold px-4 py-2.5 rounded-full shadow-xl opacity-0 pointer-events-none transition-all duration-300 z-50 flex items-center space-x-2 border border-white/10">
+      <i data-lucide="check-circle" class="w-4 h-4 text-emerald-400"></i>
+      <span id="toast-message">通知</span>
+    </div>
+
+    <!-- 下部ナビ -->
+    <nav class="bg-white border-t border-gray-200 absolute bottom-0 left-0 right-0 h-16 flex items-center justify-around z-20 shadow-lg">
+      <button class="nav-tab active flex flex-col items-center text-antlers-red transition" data-target="tab-matches">
+        <i data-lucide="calendar-days" class="w-5 h-5 mb-0.5"></i>
+        <span class="text-[10px] font-bold">試合日程</span>
+      </button>
+      <button class="nav-tab flex flex-col items-center text-gray-400 hover:text-gray-600 transition" data-target="tab-tickets">
+        <i data-lucide="ticket" class="w-5 h-5 mb-0.5"></i>
+        <span class="text-[10px] font-bold">チケット発売</span>
+      </button>
+      <button class="nav-tab flex flex-col items-center text-gray-400 hover:text-gray-600 transition" data-target="tab-settings">
+        <i data-lucide="bell-ring" class="w-5 h-5 mb-0.5"></i>
+        <span class="text-[10px] font-bold">連携設定</span>
+      </button>
+    </nav>
+  </div>
+
+  <script>
+    const now = new Date();
+    document.getElementById('current-time').textContent = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+
+    const matchData = [
+      {
+        id: 'kashima-00',
+        opponent: 'アルビレックス新潟',
+        opponentShort: '新潟',
+        isHome: true,
+        competition: '明治安田J1リーグ 第3節',
+        stadium: '県立カシマサッカースタジアム',
+        kickOff: new Date(now.getTime() - 7 * 24 * 3600 * 1000 + 14 * 3600 * 1000),
+        isCalendarSynced: true,
+        score: { kashima: 2, opponent: 1 },
+        review: {
+          style: '現地観戦 (カシマスタジアム)',
+          rating: 5,
+          mom: '鈴木優磨',
+          comment: 'カシマスタジアム現地！もつ煮を食べてからの劇的逆転勝利で最高！'
+        },
+        ticketPhases: [{ title: '一般販売', date: new Date(now.getTime() - 20 * 24 * 3600 * 1000), target: '一般対象', synced: true }]
+      },
+      {
+        id: 'kashima-01',
+        opponent: '浦和レッズ',
+        opponentShort: '浦和',
+        isHome: true,
+        competition: '明治安田J1リーグ 第4節',
+        stadium: '県立カシマサッカースタジアム',
+        kickOff: new Date(now.getTime() + 4 * 24 * 3600 * 1000 + 14 * 3600 * 1000),
+        isCalendarSynced: true,
+        score: { kashima: null, opponent: null },
+        review: null,
+        ticketPhases: [
+          { title: 'SÓCIO先行販売', date: new Date(now.getTime() - 10 * 24 * 3600 * 1000), target: 'SÓCIO全区分', synced: true },
+          { title: 'ファンクラブ先行', date: new Date(now.getTime() - 7 * 24 * 3600 * 1000), target: 'フリークス会員', synced: true },
+          { title: '一般販売', date: new Date(now.getTime() - 3 * 24 * 3600 * 1000), target: '一般対象', synced: true },
+        ]
+      },
+      {
+        id: 'kashima-02',
+        opponent: '川崎フロンターレ',
+        opponentShort: '川崎F',
+        isHome: false,
+        competition: '明治安田J1リーグ 第5節',
+        stadium: 'Uvanceとどろきスタジアム',
+        kickOff: new Date(now.getTime() + 11 * 24 * 3600 * 1000 + 19 * 3600 * 1000),
+        isCalendarSynced: false,
+        score: { kashima: null, opponent: null },
+        review: null,
+        ticketPhases: [{ title: 'アウェイ一般発売', date: new Date(now.getTime() + 1 * 24 * 3600 * 1000 + 10 * 3600 * 1000), target: 'ビジター席販売', synced: false }]
+      }
+    ];
+
+    let currentFilter = 'ALL';
+    let selectedMatchId = 'kashima-01';
+    let currentRating = 5;
+
+    function formatDate(dt) {
+      const weekdays = ['日', '月', '火', '水', '木', '金', '土'];
+      return `${dt.getMonth() + 1}/${dt.getDate()}(${weekdays[dt.getDay()]}) ${dt.getHours().toString().padStart(2, '0')}:${dt.getMinutes().toString().padStart(2, '0')}`;
+    }
+
+    function renderMatches() {
+      const listContainer = document.getElementById('match-card-list');
+      listContainer.innerHTML = '';
+
+      const filtered = matchData.filter(m => {
+        if (currentFilter === 'HOME') return m.isHome;
+        if (currentFilter === 'AWAY') return !m.isHome;
+        return true;
+      });
+
+      document.getElementById('match-count-badge').textContent = `${filtered.length}試合`;
+
+      filtered.forEach(m => {
+        const isPast = m.kickOff.getTime() < now.getTime();
+        const daysLeft = Math.ceil((m.kickOff.getTime() - now.getTime()) / (1000 * 3600 * 24));
+
+        const card = document.createElement('div');
+        card.className = `bg-white rounded-2xl p-4 shadow-sm border ${m.isCalendarSynced ? 'border-antlers-red/30' : 'border-gray-200'}`;
+        card.innerHTML = `
+          <div class="flex justify-between items-center mb-2.5">
+            <span class="text-[10px] font-bold px-2 py-0.5 rounded text-white ${m.isHome ? 'bg-antlers-red' : 'bg-antlers-navy'}">
+              ${m.isHome ? 'HOME' : 'AWAY'}
+            </span>
+            <span class="text-[10px] font-bold px-2 py-0.5 rounded-full ${isPast ? 'bg-slate-100 text-slate-700' : 'bg-orange-100 text-orange-700'}">
+              ${isPast ? '試合終了' : `あと${daysLeft}日`}
+            </span>
+          </div>
+
+          <div class="flex items-center justify-between my-2 px-1">
+            <div class="flex items-center space-x-2">
+              <div class="w-8 h-8 rounded-full bg-antlers-red text-white flex items-center justify-center font-bold text-xs shadow-sm">鹿</div>
+              <span class="font-black text-gray-900 text-sm">鹿島アントラーズ</span>
+            </div>
+            
+            <div class="flex flex-col items-center">
+              ${m.score && m.score.kashima !== null ? `
+                <span class="font-black text-base text-antlers-red">${m.score.kashima} - ${m.score.opponent}</span>
+                <span class="text-[9px] font-bold px-1.5 rounded bg-red-100 text-antlers-red">WIN</span>
+              ` : `<span class="text-xs font-black text-gray-400">VS</span>`}
+            </div>
+
+            <div class="flex items-center space-x-2 flex-row-reverse">
+              <div class="w-8 h-8 rounded-full bg-slate-800 text-white flex items-center justify-center font-bold text-xs ml-2">${m.opponentShort[0]}</div>
+              <span class="font-black text-gray-900 text-sm">${m.opponent}</span>
+            </div>
+          </div>
+
+          <div class="bg-gray-50 rounded-xl p-2.5 mt-2 flex items-center space-x-2 text-[11px] text-gray-700 border border-gray-100">
+            <i data-lucide="clock" class="w-3.5 h-3.5 text-antlers-red"></i>
+            <span class="font-bold">${formatDate(m.kickOff)} KO</span>
+            <span class="text-gray-300">|</span>
+            <span class="truncate text-gray-600">${m.stadium}</span>
+          </div>
+
+          <div class="mt-3 pt-2.5 border-t border-gray-100 flex items-center justify-between">
+            <button onclick="openReviewModal('${m.id}')" class="px-2.5 py-1.5 rounded-full text-[11px] font-bold flex items-center space-x-1 border border-antlers-red/30 bg-red-50/50 text-antlers-red active:scale-95 transition">
+              <i data-lucide="message-square" class="w-3.5 h-3.5"></i>
+              <span>${m.review ? '感想・SNS編集' : '観戦記録・SNS'}</span>
+            </button>
+            <button onclick="toggleSync('${m.id}')" class="px-3 py-1.5 rounded-full text-[11px] font-bold flex items-center space-x-1 ${m.isCalendarSynced ? 'bg-antlers-red text-white' : 'bg-gray-100 text-gray-700'} active:scale-95 transition">
+              <i data-lucide="${m.isCalendarSynced ? 'check' : 'calendar-plus'}" class="w-3.5 h-3.5"></i>
+              <span>${m.isCalendarSynced ? '連携中' : 'カレンダー登録'}</span>
+            </button>
+          </div>
+        `;
+        listContainer.appendChild(card);
+      });
+      lucide.createIcons();
+      updateStats();
+    }
+
+    function renderTickets() {
+      const container = document.getElementById('ticket-timeline-list');
+      container.innerHTML = '';
+
+      const list = [];
+      matchData.forEach(m => {
+        m.ticketPhases.forEach(p => list.push({ match: m, phase: p }));
+      });
+      list.sort((a, b) => a.phase.date - b.phase.date);
+
+      list.forEach(item => {
+        const isPassed = item.phase.date < now;
+        const row = document.createElement('div');
+        row.className = 'bg-white p-3 rounded-xl border border-gray-200 shadow-sm flex items-center justify-between';
+        row.innerHTML = `
+          <div class="flex items-center space-x-3">
+            <div class="bg-antlers-navy text-white text-center px-2 py-1.5 rounded-lg text-xs font-bold leading-tight">
+              <div>${item.phase.date.getMonth() + 1}/${item.phase.date.getDate()}</div>
+              <div class="text-[9px] text-antlers-gold">${item.phase.date.getHours().toString().padStart(2, '0')}:00</div>
+            </div>
+            <div>
+              <div class="flex items-center space-x-1.5">
+                <span class="text-[10px] font-bold px-1.5 py-0.5 rounded ${item.phase.title.includes('SÓCIO') ? 'bg-red-100 text-antlers-red' : 'bg-blue-100 text-blue-800'}">
+                  ${item.phase.title}
+                </span>
+                <span class="text-[10px] text-gray-500">${isPassed ? '受付中' : '予定'}</span>
+              </div>
+              <p class="text-xs font-bold text-gray-900 mt-0.5">vs ${item.match.opponent}（${item.match.isHome ? 'H' : 'A'}）</p>
+            </div>
+          </div>
+          <button onclick="toggleTicketSync('${item.match.id}')" class="text-gray-400 hover:text-antlers-red">
+            <i data-lucide="${item.phase.synced ? 'bell' : 'bell-off'}" class="w-4 h-4 ${item.phase.synced ? 'text-antlers-red' : ''}"></i>
+          </button>
+        `;
+        container.appendChild(row);
+      });
+      lucide.createIcons();
+    }
+
+    function openReviewModal(matchId) {
+      selectedMatchId = matchId;
+      const m = matchData.find(item => item.id === matchId);
+      if (!m) return;
+
+      document.getElementById('review-match-title').textContent = `鹿島 vs ${m.opponent} 観戦記録`;
+      document.getElementById('score-opponent-name').textContent = m.opponentShort;
+
+      if (m.review) {
+        document.getElementById('score-kashima').value = m.score.kashima ?? 2;
+        document.getElementById('score-opponent').value = m.score.opponent ?? 1;
+        document.getElementById('review-style').value = m.review.style;
+        document.getElementById('review-mom').value = m.review.mom;
+        document.getElementById('review-comment').value = m.review.comment;
+        setRating(m.review.rating);
+      } else {
+        document.getElementById('score-kashima').value = 2;
+        document.getElementById('score-opponent').value = 1;
+        document.getElementById('review-style').selectedIndex = 0;
+        document.getElementById('review-mom').value = '';
+        document.getElementById('review-comment').value = '';
+        setRating(5);
+      }
+
+      document.getElementById('review-modal').classList.remove('opacity-0', 'pointer-events-none');
+      document.getElementById('review-modal-content').classList.remove('translate-y-full');
+      lucide.createIcons();
+    }
+
+    function closeReviewModal() {
+      document.getElementById('review-modal-content').classList.add('translate-y-full');
+      document.getElementById('review-modal').classList.add('opacity-0', 'pointer-events-none');
+    }
+
+    document.getElementById('btn-close-review').addEventListener('click', closeReviewModal);
+
+    function setRating(val) {
+      currentRating = val;
+      document.querySelectorAll('.star-btn').forEach(btn => {
+        const v = parseInt(btn.getAttribute('data-value'));
+        btn.classList.toggle('text-amber-400', v <= val);
+        btn.classList.toggle('text-gray-300', v > val);
+      });
+    }
+
+    document.querySelectorAll('.star-btn').forEach(btn => {
+      btn.addEventListener('click', () => setRating(parseInt(btn.getAttribute('data-value'))));
+    });
+
+    document.getElementById('btn-save-review').addEventListener('click', () => {
+      const m = matchData.find(item => item.id === selectedMatchId);
+      if (!m) return;
+
+      m.score = {
+        kashima: parseInt(document.getElementById('score-kashima').value) || 0,
+        opponent: parseInt(document.getElementById('score-opponent').value) || 0,
+      };
+      m.review = {
+        style: document.getElementById('review-style').value,
+        rating: currentRating,
+        mom: document.getElementById('review-mom').value,
+        comment: document.getElementById('review-comment').value,
+      };
+
+      closeReviewModal();
+      renderMatches();
+      showToast('観戦ログを保存しました！');
+    });
+
+    function getShareText() {
+      const m = matchData.find(item => item.id === selectedMatchId) || matchData[0];
+      const kScore = document.getElementById('score-kashima').value || '2';
+      const oScore = document.getElementById('score-opponent').value || '1';
+      const style = document.getElementById('review-style').value;
+      const mom = document.getElementById('review-mom').value;
+      const comment = document.getElementById('review-comment').value;
+      const stars = '★'.repeat(currentRating);
+
+      return `【鹿島アントラーズ 観戦ログ】\n鹿島 ${kScore} - ${oScore} ${m.opponent}\n観戦: ${style}\n満足度: ${stars}${mom ? `\nマイMOM: ${mom}` : ''}${comment ? `\n感想: ${comment}` : ''}\n#antlers #鹿島アントラーズ`;
+    }
+
+    document.getElementById('btn-share-x').addEventListener('click', () => {
+      window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(getShareText())}`, '_blank');
+    });
+
+    document.getElementById('btn-share-line').addEventListener('click', () => {
+      window.open(`https://line.me/R/msg/text/?${encodeURIComponent(getShareText())}`, '_blank');
+    });
+
+    document.getElementById('btn-share-copy').addEventListener('click', () => {
+      navigator.clipboard.writeText(getShareText());
+      showToast('シェア文章をコピーしました！');
+    });
+
+    function toggleSync(id) {
+      const match = matchData.find(m => m.id === id);
+      if (!match) return;
+      match.isCalendarSynced = !match.isCalendarSynced;
+      renderMatches();
+      showToast(match.isCalendarSynced ? 'カレンダーに登録しました' : '登録を解除しました');
+    }
+
+    function toggleTicketSync(matchId) {
+      const match = matchData.find(m => m.id === matchId);
+      if (match) {
+        match.ticketPhases.forEach(p => p.synced = !p.synced);
+        renderTickets();
+        showToast('通知設定を更新しました');
+      }
+    }
+
+    function updateStats() {
+      const count = matchData.filter(m => m.isCalendarSynced).length;
+      document.getElementById('stat-synced-matches').textContent = `${count} 試合`;
+    }
+
+    function showToast(msg) {
+      const toast = document.getElementById('toast');
+      document.getElementById('toast-message').textContent = msg;
+      toast.classList.remove('opacity-0', 'pointer-events-none');
+      setTimeout(() => toast.classList.add('opacity-0', 'pointer-events-none'), 2000);
+    }
+
+    // フィルター切り替え
+    document.querySelectorAll('.filter-btn').forEach(btn => {
+      btn.addEventListener('click', e => {
+        document.querySelectorAll('.filter-btn').forEach(b => {
+          b.className = 'filter-btn px-3 py-1 rounded-full text-[11px] text-gray-300 bg-white/10 hover:bg-white/20 transition';
+        });
+        e.target.className = 'filter-btn active px-3 py-1 rounded-full text-[11px] font-bold bg-antlers-red text-white border border-antlers-gold shadow-sm transition';
+        currentFilter = e.target.dataset.filter;
+        renderMatches();
+      });
+    });
+
+    // タブ切り替え
+    document.querySelectorAll('.nav-tab').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.nav-tab').forEach(b => {
+          b.classList.remove('active', 'text-antlers-red');
+          b.classList.add('text-gray-400');
+        });
+        btn.classList.add('active', 'text-antlers-red');
+        btn.classList.remove('text-gray-400');
+
+        ['tab-matches', 'tab-tickets', 'tab-settings'].forEach(id => {
+          document.getElementById(id).classList.add('hidden');
+        });
+        document.getElementById(btn.dataset.target).classList.remove('hidden');
+
+        if (btn.dataset.target === 'tab-tickets') renderTickets();
+      });
+    });
+
+    // 一括同期
+    const syncAll = () => {
+      matchData.forEach(m => {
+        m.isCalendarSynced = true;
+        m.ticketPhases.forEach(p => p.synced = true);
+      });
+      renderMatches();
+      renderTickets();
+      showToast('全試合・チケットをカレンダーに同期しました！');
+    };
+    document.getElementById('btn-sync-all-header').addEventListener('click', syncAll);
+    document.getElementById('btn-re-sync').addEventListener('click', syncAll);
+
+    // .ics 書き出し
+    document.getElementById('btn-export-ics').addEventListener('click', () => {
+      const ics = `BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//Antlers Schedule//JA\nBEGIN:VEVENT\nSUMMARY:【J1】鹿島 vs 浦和\nDESCRIPTION:明治安田J1 第4節\\nカシマサッカースタジアム\nEND:VEVENT\nEND:VCALENDAR`;
+      const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8;' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = 'antlers_schedule.ics';
+      link.click();
+      showToast('.icsファイルをダウンロードしました');
+    });
+
+    renderMatches();
+  </script>
+</body>
+</html>
